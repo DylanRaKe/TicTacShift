@@ -95,7 +95,11 @@ struct ContentView: View {
                 ForEach(GameMode.allCases, id: \.self) { mode in
                     if mode.isEnabled {
                         NavigationLink {
-                            GameBoardView(game: TicTacShiftGame(gameMode: mode))
+                            if mode == .versus {
+                                VersusView()
+                            } else {
+                                GameBoardView(game: TicTacShiftGame(gameMode: mode))
+                            }
                         } label: {
                             ModernModeButtonView(mode: mode)
                         }
@@ -138,8 +142,8 @@ struct ModernModeButtonView: View {
             return "Normal"
         case .bot:
             return "vs Bot"
-        case .special:
-            return "Spécial"
+        case .versus:
+            return "Versus"
         }
     }
     
@@ -149,8 +153,8 @@ struct ModernModeButtonView: View {
             return "Jouer contre un autre joueur"
         case .bot:
             return "Défier l'intelligence artificielle"
-        case .special:
-            return "Bientôt disponible"
+        case .versus:
+            return "Jouer en ligne via Game Center"
         }
     }
     

@@ -27,14 +27,12 @@ enum GameResult: Codable, Equatable {
 enum GameMode: String, Codable, CaseIterable {
     case normal = "Normal"
     case bot = "vs Bot"
-    case special = "Special"
+    case versus = "Versus"
     
     var isEnabled: Bool {
         switch self {
-        case .normal, .bot:
+        case .normal, .bot, .versus:
             return true
-        case .special:
-            return false
         }
     }
     
@@ -44,8 +42,8 @@ enum GameMode: String, Codable, CaseIterable {
             return "person.2.fill"
         case .bot:
             return "cpu"
-        case .special:
-            return "star.fill"
+        case .versus:
+            return "wifi"
         }
     }
     
@@ -55,8 +53,8 @@ enum GameMode: String, Codable, CaseIterable {
             return [.blue, .cyan]
         case .bot:
             return [.purple, .pink]
-        case .special:
-            return [.orange, .yellow]
+        case .versus:
+            return [.green, .mint]
         }
     }
 }
