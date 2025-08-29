@@ -13,6 +13,8 @@ struct TicTacShiftApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            TicTacShiftGame.self,
+            GameMove.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
