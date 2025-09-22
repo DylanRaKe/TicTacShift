@@ -85,15 +85,26 @@ final class TicTacShiftGame {
     var createdAt: Date
     var gameMode: GameMode
     var isWaitingForBot: Bool
+    var botPlayer: Player? // For bot mode, which player is the bot
+    @Transient
+    var winningLine: WinningLine? // Information about the winning line
     
     init(gameMode: GameMode = .normal) {
         self.moves = []
-        self.currentPlayer = .x
+        self.currentPlayer = Bool.random() ? .x : .o
         self.moveCounter = 0
         self.gameResult = .ongoing
         self.createdAt = Date()
         self.gameMode = gameMode
         self.isWaitingForBot = false
+        self.winningLine = nil
+        
+        // For bot mode, bot is always O, human is always X
+        if gameMode == .bot {
+            self.botPlayer = .o
+        } else {
+            self.botPlayer = nil
+        }
     }
     
     // Get current board state (3x3 grid)
@@ -182,6 +193,11 @@ final class TicTacShiftGame {
             if let player = board[row][0],
                board[row][1] == player && board[row][2] == player {
                 gameResult = .win(player)
+                winningLine = WinningLine(
+                    type: .horizontal,
+                    index: row,
+                    positions: [(row, 0), (row, 1), (row, 2)]
+                )
                 return
             }
         }
@@ -191,41 +207,67 @@ final class TicTacShiftGame {
             if let player = board[0][col],
                board[1][col] == player && board[2][col] == player {
                 gameResult = .win(player)
+                winningLine = WinningLine(
+                    type: .vertical,
+                    index: col,
+                    positions: [(0, col), (1, col), (2, col)]
+                )
                 return
             }
         }
         
-        // Check diagonals
+        // Check main diagonal
         if let player = board[0][0],
            board[1][1] == player && board[2][2] == player {
             gameResult = .win(player)
+            winningLine = WinningLine(
+                type: .diagonal,
+                index: 0,
+                positions: [(0, 0), (1, 1), (2, 2)]
+            )
             return
         }
         
+        // Check anti diagonal
         if let player = board[0][2],
            board[1][1] == player && board[2][0] == player {
             gameResult = .win(player)
+            winningLine = WinningLine(
+                type: .diagonal,
+                index: 1,
+                positions: [(0, 2), (1, 1), (2, 0)]
+            )
             return
         }
         
         // Check for draw (after 20 moves total)
         if moveCounter >= 20 {
             gameResult = .draw
+            winningLine = nil
         }
     }
     
     // Reset game
     func resetGame() {
         moves.removeAll()
-        currentPlayer = .x
+        currentPlayer = Bool.random() ? .x : .o
         moveCounter = 0
         gameResult = .ongoing
         isWaitingForBot = false
+        winningLine = nil
+        
+        // For bot mode, bot is always O, human is always X
+        if gameMode == .bot {
+            self.botPlayer = .o
+        }
     }
     
     // Bot AI logic
     func makeBotMove() -> Bool {
-        guard gameMode == .bot && currentPlayer == .o && gameResult == .ongoing else { return false }
+        guard gameMode == .bot,
+              let botPlayer = botPlayer,
+              currentPlayer == botPlayer,
+              gameResult == .ongoing else { return false }
         
         isWaitingForBot = true
         
@@ -239,12 +281,12 @@ final class TicTacShiftGame {
         let board = boardState
         
         // Try to win
-        if let winMove = findWinningMove(for: .o, board: board) {
+        if let winMove = findWinningMove(for: botPlayer, board: board) {
             return placeMove(at: winMove.0, column: winMove.1)
         }
         
         // Try to block opponent
-        if let blockMove = findWinningMove(for: .x, board: board) {
+        if let blockMove = findWinningMove(for: botPlayer.opposite, board: board) {
             return placeMove(at: blockMove.0, column: blockMove.1)
         }
         

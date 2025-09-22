@@ -12,7 +12,6 @@ import SwiftData
 struct TicTacShiftApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
             TicTacShiftGame.self,
             GameMove.self,
         ])
@@ -28,6 +27,9 @@ struct TicTacShiftApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    print("🚀 App launched - Local mode only")
+                }
         }
         .modelContainer(sharedModelContainer)
     }

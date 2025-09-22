@@ -10,14 +10,16 @@ import SwiftUI
 struct GameBoardView: View {
     @Bindable var game: TicTacShiftGame
     @State private var animatingSquares: Set<String> = []
-    @State private var victoryManager = VictoryAnimationManager()
+    @State private var showVictoryScreen = false
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dismiss) private var dismiss
     
     private var isPlayerTurn: Bool {
         // In normal mode, always allow moves (both players are human)
-        // In bot mode, only allow moves when it's player X's turn (human) and bot is not thinking
+        // In bot mode, only allow moves when it's the human player's turn and bot is not thinking
         if game.gameMode == .bot {
-            return game.currentPlayer == .x && !game.isWaitingForBot
+            let humanPlayer = game.botPlayer?.opposite ?? .x
+            return game.currentPlayer == humanPlayer && !game.isWaitingForBot
         } else {
             return true
         }
@@ -25,21 +27,33 @@ struct GameBoardView: View {
     
     var body: some View {
         ZStack {
-            // Background
+            // Dynamic background based on current player
             LinearGradient(
-                colors: game.gameMode.gradient.map { $0.opacity(0.05) },
+                colors: [
+                    Color(.systemBackground),
+                    getCurrentPlayerColor().opacity(0.1),
+                    getCurrentPlayerColor().opacity(0.05)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.8), value: game.currentPlayer)
             
             ScrollView {
                 VStack(spacing: 24) {
                     // Game status header
                     gameStatusHeader
                     
-                    // Game board
-                    gameBoard
+                    // Game board with winning line overlay
+                    ZStack {
+                        gameBoard
+                        
+                        // Winning line overlay
+                        if game.gameResult != .ongoing, let winningLine = game.winningLine {
+                            WinningLineOverlay(winningLine: winningLine)
+                        }
+                    }
                     
                     // Game controls
                     gameControls
@@ -52,11 +66,26 @@ struct GameBoardView: View {
                 .padding()
             }
             
-            // Victory animation overlay
-            VictoryAnimationView(
-                animationManager: victoryManager,
-                winnerText: getVictoryText()
-            )
+            // Modern Victory Screen
+            if showVictoryScreen {
+                ModernVictoryView(
+                    gameResult: game.gameResult,
+                    gameMode: game.gameMode,
+                    botPlayer: game.botPlayer,
+                    winningLine: game.winningLine,
+                    onPlayAgain: {
+                        withAnimation(.spring(response: 0.6)) {
+                            game.resetGame()
+                            showVictoryScreen = false
+                        }
+                    },
+                    onBackToMenu: {
+                        dismiss()
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .zIndex(10)
+            }
         }
         .navigationTitle(game.gameMode.rawValue)
         .navigationBarTitleDisplayMode(.inline)
@@ -67,9 +96,13 @@ struct GameBoardView: View {
             checkForBotMove()
         }
         .onChange(of: game.gameResult) {
-            if case .win(_) = game.gameResult {
-                let winningSquares = getWinningSquares()
-                victoryManager.startVictoryAnimation(winningSquares: winningSquares)
+            if game.gameResult != .ongoing {
+                // Show victory screen after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+                        showVictoryScreen = true
+                    }
+                }
             }
         }
     }
@@ -146,7 +179,7 @@ struct GameBoardView: View {
                     HStack {
                         Image(systemName: "crown.fill")
                             .foregroundColor(.yellow)
-                        Text("\(game.gameMode == .bot && player == .o ? "Bot" : "Joueur \(player.rawValue)") gagne !")
+                        Text("\(game.gameMode == .bot && player == game.botPlayer ? "Bot" : "Joueur \(player.rawValue)") gagne !")
                             .font(.system(size: 18, weight: .bold, design: .monospaced))
                             .foregroundColor(player == .x ? .blue : .red)
                         Image(systemName: "crown.fill")
@@ -200,10 +233,6 @@ struct GameBoardView: View {
                         ) {
                             makePlayerMove(row: row, column: column)
                         }
-                        .winningSquareGlow(
-                            isWinning: victoryManager.winningPositions.contains { $0.0 == row && $0.1 == column },
-                            reduceMotion: reduceMotion
-                        )
                     }
                 }
             }
@@ -221,7 +250,7 @@ struct GameBoardView: View {
             Button {
                 withAnimation(.spring(response: 0.5)) {
                     game.resetGame()
-                    victoryManager.stopAnimation()
+                    showVictoryScreen = false
                 }
             } label: {
                 HStack {
@@ -236,7 +265,7 @@ struct GameBoardView: View {
                 Button {
                     withAnimation(.spring(response: 0.5)) {
                         game.resetGame()
-                        victoryManager.stopAnimation()
+                        showVictoryScreen = false
                     }
                 } label: {
                     HStack {
@@ -277,7 +306,7 @@ struct GameBoardView: View {
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(game.gameMode == .bot && move.player == .o ? "Bot" : "Player \(move.player.rawValue)")
+                                Text(game.gameMode == .bot && move.player == game.botPlayer ? "Bot" : "Player \(move.player.rawValue)")
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundColor(move.player == .x ? .blue : .red)
@@ -330,47 +359,10 @@ struct GameBoardView: View {
     
     // MARK: - Helper Functions
     
-    private func getVictoryText() -> String {
-        if case .win(let player) = game.gameResult {
-            return "\(game.gameMode == .bot && player == .o ? "Bot" : "Joueur \(player.rawValue)") remporte la partie !"
-        }
-        return ""
+    private func getCurrentPlayerColor() -> Color {
+        return game.currentPlayer == .x ? .blue : .red
     }
     
-    private func getWinningSquares() -> [(Int, Int)] {
-        guard case .win(_) = game.gameResult else { return [] }
-        
-        let board = game.boardState
-        
-        // Check rows
-        for row in 0..<3 {
-            if let player = board[row][0],
-               board[row][1] == player && board[row][2] == player {
-                return [(row, 0), (row, 1), (row, 2)]
-            }
-        }
-        
-        // Check columns  
-        for col in 0..<3 {
-            if let player = board[0][col],
-               board[1][col] == player && board[2][col] == player {
-                return [(0, col), (1, col), (2, col)]
-            }
-        }
-        
-        // Check diagonals
-        if let player = board[0][0],
-           board[1][1] == player && board[2][2] == player {
-            return [(0, 0), (1, 1), (2, 2)]
-        }
-        
-        if let player = board[0][2],
-           board[1][1] == player && board[2][0] == player {
-            return [(0, 2), (1, 1), (2, 0)]
-        }
-        
-        return []
-    }
     
     private func makePlayerMove(row: Int, column: Int) {
         let squareKey = "\(row)-\(column)"
@@ -387,7 +379,8 @@ struct GameBoardView: View {
     
     private func checkForBotMove() {
         guard game.gameMode == .bot,
-              game.currentPlayer == .o,
+              let botPlayer = game.botPlayer,
+              game.currentPlayer == botPlayer,
               game.gameResult == .ongoing,
               !game.isWaitingForBot else { return }
         
@@ -420,7 +413,7 @@ struct PlayerIndicator: View {
             }
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(gameMode == .bot && player == .o ? "Bot" : "Player \(player.rawValue)")
+                Text("Player \(player.rawValue)")
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(isActive ? (player == .x ? .blue : .red) : .secondary)
