@@ -248,7 +248,7 @@ struct ContentView: View {
 
 // MARK: - Supporting Models & Views
 
-private struct GameFeature: Identifiable {
+internal struct GameFeature: Identifiable {
     let id = UUID()
     let icon: String
     let title: String
@@ -455,7 +455,7 @@ struct CompactModeButton: View {
     }
 }
 
-struct FeatureCard: View {
+private struct FeatureCard: View {
     let feature: GameFeature
     let glow: Bool
     let reduceMotion: Bool
