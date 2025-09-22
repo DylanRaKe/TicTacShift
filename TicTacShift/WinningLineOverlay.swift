@@ -9,8 +9,8 @@ import SwiftUI
 
 struct WinningLineOverlay: View {
     let winningLine: WinningLine?
-    let squareSize: CGFloat = 90
-    let spacing: CGFloat = 6
+    let squareSize: CGFloat = 96
+    let spacing: CGFloat = 12
     @State private var animationProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     
