@@ -20,33 +20,14 @@ struct NeonBackground: View {
             .ignoresSafeArea()
 
             if !reduceMotion {
-                GeometryReader { _ in
-                    Canvas { context, size in
-                        let gradient = Gradient(colors: [
-                            Color.neonMagenta.opacity(0.9),
-                            Color.neonCyan.opacity(0.8),
-                            Color.neonYellow.opacity(0.75)
-                        ])
-
-                        var path = Path()
-                        path.addRoundedRect(in: CGRect(origin: .zero, size: size), cornerSize: CGSize(width: size.width * 0.4, height: size.height * 0.4))
-
-                        context.addFilter(.blur(radius: 120))
-                        context.draw(
-                            .linearGradient(
-                                LinearGradient(
-                                    gradient: gradient,
-                                    startPoint: CGPoint(x: 0, y: reduceMotion ? size.height * 0.25 : glowShift ? size.height * 0.7 : size.height * 0.3),
-                                    endPoint: CGPoint(x: size.width, y: reduceMotion ? size.height * 0.75 : glowShift ? size.height * 0.2 : size.height * 0.9)
-                                ),
-                                start: CGPoint(x: -size.width * 0.3, y: -size.height * 0.2),
-                                end: CGPoint(x: size.width * 1.3, y: size.height * 1.2)
-                            ),
-                            in: path
-                        )
-                    }
+                GeometryReader { proxy in
+                    animatedGradient(in: proxy.size)
+                        .blur(radius: 120)
+                        .scaleEffect(1.4)
+                        .offset(y: glowShift ? -20 : 0)
+                        .animation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true), value: glowShift)
+                        .ignoresSafeArea()
                 }
-                .ignoresSafeArea()
                 .overlay(
                     Circle()
                         .stroke(Color.white.opacity(0.08), lineWidth: 1.2)
@@ -67,6 +48,43 @@ struct NeonBackground: View {
             glowShift = true
             ripple = true
         }
+    }
+}
+
+private extension NeonBackground {
+    func animatedGradient(in size: CGSize) -> LinearGradient {
+        let colors = [
+            Color.neonMagenta.opacity(0.9),
+            Color.neonCyan.opacity(0.8),
+            Color.neonYellow.opacity(0.75)
+        ]
+
+        let points = gradientPoints()
+        return LinearGradient(
+            gradient: Gradient(colors: colors),
+            startPoint: points.start,
+            endPoint: points.end
+        )
+    }
+
+    func gradientPoints() -> (start: UnitPoint, end: UnitPoint) {
+        let raw: (Double, Double)
+
+        if reduceMotion {
+            raw = (0.25, 0.75)
+        } else if glowShift {
+            raw = (0.7, 0.2)
+        } else {
+            raw = (0.3, 0.9)
+        }
+
+        let start = max(0.0, min(1.0, raw.0))
+        let end = max(0.0, min(1.0, raw.1))
+
+        return (
+            UnitPoint(x: 0, y: start),
+            UnitPoint(x: 1, y: end)
+        )
     }
 }
 
