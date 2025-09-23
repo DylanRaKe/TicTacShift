@@ -50,11 +50,11 @@ enum GameMode: String, Codable, CaseIterable {
     var gradient: [Color] {
         switch self {
         case .normal:
-            return [.blue, .cyan]
+            return [.neonMagenta, .neonBlue]
         case .bot:
-            return [.purple, .pink]
+            return [.neonYellow, .orange]
         case .versus:
-            return [.green, .mint]
+            return [.neonCyan, .teal]
         }
     }
 }

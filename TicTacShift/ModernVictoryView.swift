@@ -12,305 +12,194 @@ struct ModernVictoryView: View {
     let gameMode: GameMode
     let botPlayer: Player?
     let winningLine: WinningLine?
+    let moveCount: Int
     let onPlayAgain: () -> Void
     let onBackToMenu: () -> Void
-    
+
     @State private var showContent = false
-    @State private var showButtons = false
-    @State private var pulseEffect = false
-    @Environment(\.accessibilityReduceMotion) var reduceMotion
-    
+    @State private var animateBadge = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         ZStack {
-            // Dynamic background based on result
-            backgroundView
-            
-            // Particle system
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            VStack(spacing: 28) {
+                NeonGlass(cornerRadius: 36, strokeOpacity: 0.22, shadowColor: .neonMagenta.opacity(0.35)) {
+                    VStack(spacing: 20) {
+                        badge
+                        titleBlock
+                        if let winningLine { winningLineBlock(winningLine) }
+                        modeStats
+                    }
+                }
+
+                buttonsStack
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 40)
+            .scaleEffect(showContent ? 1 : 0.86)
+            .opacity(showContent ? 1 : 0)
+
             if !reduceMotion {
-                ParticleSystemView(
-                    isActive: showContent,
-                    gameResult: gameResult,
-                    reduceMotion: reduceMotion
-                )
+                ParticleSystemView(isActive: showContent, gameResult: gameResult, reduceMotion: reduceMotion)
+                    .allowsHitTesting(false)
             }
-            
-            // Main content
-            VStack(spacing: 32) {
-                Spacer()
-                
-                // Result icon and title
-                resultHeaderView
-                
-                // Winner information
-                winnerInfoView
-                
-                // Action buttons
-                actionButtonsView
-                
-                Spacer()
-            }
-            .padding(.horizontal, 32)
-            .scaleEffect(showContent ? 1.0 : 0.3)
-            .opacity(showContent ? 1.0 : 0.0)
         }
-        .onAppear {
-            startVictorySequence()
-        }
+        .onAppear { startSequence() }
     }
-    
-    private var backgroundView: some View {
-        Group {
-            switch gameResult {
-            case .win(let player):
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.7),
-                        (player == .x ? Color.blue : Color.red).opacity(0.3),
-                        Color.black.opacity(0.8)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-            case .draw:
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.7),
-                        Color.orange.opacity(0.3),
-                        Color.black.opacity(0.8)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-            case .ongoing:
-                Color.clear
-            }
-        }
-        .ignoresSafeArea()
-    }
-    
-    private var resultHeaderView: some View {
-        VStack(spacing: 20) {
-            // Animated icon
-            Group {
-                switch gameResult {
-                case .win(let player):
-                    ZStack {
-                        // Glow effect
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        (player == .x ? Color.blue : Color.red).opacity(0.6),
-                                        Color.clear
-                                    ],
-                                    center: .center,
-                                    startRadius: 10,
-                                    endRadius: pulseEffect ? 80 : 60
-                                )
-                            )
-                            .frame(width: 120, height: 120)
-                            .animation(
-                                .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                                value: pulseEffect
-                            )
-                        
-                        // Main icon
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 60, weight: .bold))
-                            .foregroundColor(.yellow)
-                            .shadow(color: .yellow, radius: 15)
-                    }
-                    
-                case .draw:
-                    ZStack {
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        Color.orange.opacity(0.6),
-                                        Color.clear
-                                    ],
-                                    center: .center,
-                                    startRadius: 10,
-                                    endRadius: pulseEffect ? 80 : 60
-                                )
-                            )
-                            .frame(width: 120, height: 120)
-                            .animation(
-                                .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                                value: pulseEffect
-                            )
-                        
-                        Image(systemName: "equal.circle.fill")
-                            .font(.system(size: 60, weight: .bold))
-                            .foregroundColor(.orange)
-                            .shadow(color: .orange, radius: 15)
-                    }
-                    
-                case .ongoing:
-                    EmptyView()
-                }
-            }
-            
-            // Title text
-            Group {
-                switch gameResult {
-                case .win(let player):
-                    VStack(spacing: 8) {
-                        Text("🎉 VICTOIRE ! 🎉")
-                            .font(.system(size: 32, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                            .shadow(color: .white.opacity(0.8), radius: 10)
-                        
-                        Text(getWinnerName(player))
-                            .font(.system(size: 24, weight: .bold, design: .monospaced))
-                            .foregroundColor(player == .x ? .blue : .red)
-                            .shadow(color: player == .x ? .blue : .red, radius: 8)
-                    }
-                    
-                case .draw:
-                    VStack(spacing: 8) {
-                        Text("⚖️ ÉGALITÉ ! ⚖️")
-                            .font(.system(size: 32, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                            .shadow(color: .white.opacity(0.8), radius: 10)
-                        
-                        Text("Aucun vainqueur")
-                            .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.orange)
-                            .shadow(color: .orange, radius: 8)
-                    }
-                    
-                case .ongoing:
-                    EmptyView()
-                }
-            }
-        }
-    }
-    
-    private var winnerInfoView: some View {
-        VStack(spacing: 16) {
-            if case .win(_) = gameResult, let line = winningLine {
-                // Winning line info
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.right")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.8))
-                    
-                    Text(getWinningLineDescription(line))
-                        .font(.system(size: 16, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                    
-                    Image(systemName: "arrow.left")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.3), radius: 8)
-                )
-            }
-            
-            // Game stats
-            HStack(spacing: 24) {
-                StatView(
-                    icon: "timer",
-                    title: "Mode",
-                    value: gameMode.rawValue
-                )
-                
-                if case .win(_) = gameResult {
-                    StatView(
-                        icon: "target",
-                        title: "Résultat",
-                        value: "Victoire"
-                    )
-                } else if case .draw = gameResult {
-                    StatView(
-                        icon: "scale.3d",
-                        title: "Résultat", 
-                        value: "Égalité"
-                    )
-                }
-            }
-        }
-        .opacity(showButtons ? 1.0 : 0.0)
-        .animation(.easeOut(duration: 0.6).delay(0.8), value: showButtons)
-    }
-    
-    private var actionButtonsView: some View {
-        VStack(spacing: 16) {
-            // Play Again button
-            Button {
-                onPlayAgain()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.title2)
-                    Text("Rejouer")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color.blue, Color.blue.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .blue.opacity(0.5), radius: 8, y: 4)
-            }
-            .scaleEffect(showButtons ? 1.0 : 0.8)
-            
-            // Back to Menu button
-            Button {
-                onBackToMenu()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "house")
-                        .font(.title2)
-                    Text("Menu Principal")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .foregroundColor(.white.opacity(0.9))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
-                )
+
+    private var badge: some View {
+        ZStack {
+            Circle()
+                .fill(badgeGradient)
+                .frame(width: 110, height: 110)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    Circle()
+                        .stroke(Color.white.opacity(0.28), lineWidth: 1.2)
                 )
+                .shadow(color: primaryColor.opacity(0.5), radius: 18, y: 12)
+
+            Image(systemName: badgeIcon)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.25), radius: 10, y: 6)
+        }
+        .scaleEffect(reduceMotion ? 1 : animateBadge ? 1.08 : 0.94)
+        .rotationEffect(.degrees(reduceMotion ? 0 : animateBadge ? 6 : -4))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: animateBadge)
+    }
+
+    private var titleBlock: some View {
+        VStack(spacing: 14) {
+            Text(titleText)
+                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .shadow(color: Color.white.opacity(0.6), radius: 14, y: 6)
+
+            Text(subtitleText)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundColor(primaryColor)
+        }
+    }
+
+    private func winningLineBlock(_ line: WinningLine) -> some View {
+        VStack(spacing: 12) {
+            Text("Ligne victorieuse")
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.7))
+
+            HStack(spacing: 10) {
+                Image(systemName: "sparkle")
+                    .foregroundColor(primaryColor)
+                Text(lineDescription(line))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
             }
-            .scaleEffect(showButtons ? 1.0 : 0.8)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .background(Color.white.opacity(0.08), in: Capsule())
         }
-        .opacity(showButtons ? 1.0 : 0.0)
-        .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(1.0), value: showButtons)
     }
-    
-    // MARK: - Helper Functions
-    
-    private func getWinnerName(_ player: Player) -> String {
+
+    private var modeStats: some View {
+        HStack(spacing: 18) {
+            StatBadge(title: "Mode", value: gameModeLabel, icon: gameMode.icon)
+            StatBadge(title: "Tours", value: "\(max(moveCount, 1))", icon: "timer")
+            if case .win(let winner) = gameResult {
+                StatBadge(title: "MVP", value: playerName(for: winner), icon: "crown.fill")
+            } else if case .draw = gameResult {
+                StatBadge(title: "Statut", value: "Égalité", icon: "equal")
+            }
+        }
+    }
+
+    private var buttonsStack: some View {
+        VStack(spacing: 14) {
+            Button(action: onPlayAgain) {
+                Label("Relancer une manche", systemImage: "arrow.clockwise")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            }
+            .buttonStyle(NeonButtonStyle(
+                gradient: LinearGradient(colors: [Color.neonMagenta, Color.neonBlue], startPoint: .topLeading, endPoint: .bottomTrailing)
+            ))
+
+            Button(action: onBackToMenu) {
+                Label("Retour au menu", systemImage: "house")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+            }
+            .buttonStyle(NeonButtonStyle(
+                gradient: LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                foreground: .white.opacity(0.85),
+                scale: 0.98
+            ))
+        }
+    }
+
+    private var primaryColor: Color {
+        switch gameResult {
+        case .win(let player):
+            return player == .x ? .neonMagenta : .neonCyan
+        case .draw:
+            return .neonYellow
+        case .ongoing:
+            return .white
+        }
+    }
+
+    private var badgeGradient: LinearGradient {
+        LinearGradient(colors: [primaryColor.opacity(0.28), Color.white.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    private var badgeIcon: String {
+        switch gameResult {
+        case .win:
+            return "crown.fill"
+        case .draw:
+            return "equal.circle.fill"
+        case .ongoing:
+            return "circle"
+        }
+    }
+
+    private var titleText: String {
+        switch gameResult {
+        case .win:
+            return "Victoire !"
+        case .draw:
+            return "Égalité serrée"
+        case .ongoing:
+            return "Partie en cours"
+        }
+    }
+
+    private var subtitleText: String {
+        switch gameResult {
+        case .win(let winner):
+            return "\(playerName(for: winner)) prend l'avantage"
+        case .draw:
+            return "Personne ne cède"
+        case .ongoing:
+            return "La bataille continue"
+        }
+    }
+
+    private var gameModeLabel: String {
         switch gameMode {
-        case .bot:
-            return player == botPlayer ? "Bot Gagne !" : "Vous Gagnez !"
-        case .normal, .versus:
-            return "Joueur \(player.rawValue) Gagne !"
+        case .normal: return "Local"
+        case .bot: return "Bot"
+        case .versus: return "Versus"
         }
     }
-    
-    private func getWinningLineDescription(_ line: WinningLine) -> String {
+
+    private func playerName(for player: Player) -> String {
+        if gameMode == .bot {
+            return player == botPlayer ? "Bot" : "Vous"
+        }
+        return "Joueur \(player.rawValue)"
+    }
+
+    private func lineDescription(_ line: WinningLine) -> String {
         switch line.type {
         case .horizontal:
             return "Ligne horizontale \(line.index + 1)"
@@ -320,49 +209,45 @@ struct ModernVictoryView: View {
             return line.index == 0 ? "Diagonale ↘" : "Diagonale ↙"
         }
     }
-    
-    private func startVictorySequence() {
-        // Phase 1: Show main content
-        withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.2)) {
+
+    private func startSequence() {
+        if reduceMotion {
+            showContent = true
+            return
+        }
+
+        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
             showContent = true
         }
-        
-        // Start pulse effect
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            pulseEffect = true
-        }
-        
-        // Phase 2: Show buttons
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            showButtons = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            animateBadge = true
         }
     }
 }
 
-struct StatView: View {
-    let icon: String
+private struct StatBadge: View {
     let title: String
     let value: String
-    
+    let icon: String
+
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(.white.opacity(0.8))
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
-            
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.white.opacity(0.5))
             Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.9))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.08))
         )
     }
 }
@@ -371,133 +256,90 @@ struct ParticleSystemView: View {
     let isActive: Bool
     let gameResult: GameResult
     let reduceMotion: Bool
-    
     @State private var particles: [VictoryParticle] = []
-    
+
     var body: some View {
         ZStack {
-            ForEach(particles, id: \.id) { particle in
+            ForEach(particles) { particle in
                 ParticleView(particle: particle)
             }
         }
         .onAppear {
-            if isActive && !reduceMotion {
-                generateParticles()
-                startParticleAnimation()
-            }
+            guard isActive, !reduceMotion else { return }
+            generateParticles()
+            animateParticles()
         }
     }
-    
+
     private func generateParticles() {
-        let particleCount: Int
+        let count: Int
         switch gameResult {
-        case .win(_): 
-            particleCount = 30
-        case .draw: 
-            particleCount = 15
-        case .ongoing: 
-            particleCount = 0
+        case .win:
+            count = 28
+        case .draw:
+            count = 16
+        case .ongoing:
+            count = 0
         }
-        
-        particles = (0..<particleCount).map { index in
+
+        particles = (0..<count).map { index in
             VictoryParticle(
-                id: index,
-                startX: Double.random(in: -50...UIScreen.main.bounds.width + 50),
-                startY: Double.random(in: -100...(-50)),
-                color: getParticleColor(),
-                size: Double.random(in: 3...8),
-                duration: Double.random(in: 2...4)
+                id: UUID(),
+                position: CGPoint(x: Double.random(in: 0...1), y: Double.random(in: 0...1)),
+                speed: Double.random(in: 0.4...1.2),
+                angle: Double.random(in: 0...(Double.pi * 2)),
+                color: particleColors.randomElement() ?? .white,
+                size: Double.random(in: 4...10),
+                delay: Double(index) * 0.08
             )
         }
     }
-    
-    private func getParticleColor() -> Color {
+
+    private var particleColors: [Color] {
         switch gameResult {
         case .win(let player):
-            return [Color.yellow, Color.orange, player == .x ? Color.blue : Color.red].randomElement()!
+            return [player == .x ? .neonMagenta : .neonCyan, .neonYellow, .white]
         case .draw:
-            return [Color.orange, Color.yellow, Color.red].randomElement()!
+            return [.neonYellow, .white.opacity(0.9)]
         case .ongoing:
-            return Color.clear
+            return [.white]
         }
     }
-    
-    private func startParticleAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            for i in 0..<particles.count {
-                particles[i].update()
-            }
-            
-            // Remove particles that are off screen
-            particles.removeAll { $0.y > UIScreen.main.bounds.height + 100 }
-            
-            if particles.isEmpty {
-                timer.invalidate()
+
+    private func animateParticles() {
+        for index in particles.indices {
+            let delay = particles[index].delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                particles[index].isActive = true
             }
         }
     }
 }
 
+struct VictoryParticle: Identifiable {
+    let id: UUID
+    var position: CGPoint
+    let speed: Double
+    let angle: Double
+    let color: Color
+    let size: Double
+    let delay: Double
+    var isActive: Bool = false
+}
+
 struct ParticleView: View {
-    let particle: VictoryParticle
-    
+    @State var particle: VictoryParticle
+
     var body: some View {
         Circle()
             .fill(particle.color)
             .frame(width: particle.size, height: particle.size)
-            .position(x: particle.x, y: particle.y)
-            .opacity(particle.opacity)
+            .opacity(particle.isActive ? 0 : 1)
+            .offset(x: particle.isActive ? CGFloat(cos(particle.angle) * 140) : 0,
+                    y: particle.isActive ? CGFloat(sin(particle.angle) * 140) : 0)
+            .animation(
+                .easeOut(duration: particle.speed),
+                value: particle.isActive
+            )
     }
-}
-
-struct VictoryParticle {
-    let id: Int
-    var x: Double
-    var y: Double
-    let color: Color
-    let size: Double
-    let duration: Double
-    var opacity: Double = 1.0
-    var velocity: Double = 2.0
-    
-    init(id: Int, startX: Double, startY: Double, color: Color, size: Double, duration: Double) {
-        self.id = id
-        self.x = startX
-        self.y = startY
-        self.color = color
-        self.size = size
-        self.duration = duration
-        self.velocity = Double.random(in: 1...4)
-    }
-    
-    mutating func update() {
-        y += velocity
-        velocity += 0.1 // Gravity
-        opacity = max(0, opacity - 0.01)
-    }
-}
-
-// MARK: - Winning Line Data
-
-struct WinningLine {
-    let type: WinningLineType
-    let index: Int
-    let positions: [(Int, Int)]
-}
-
-enum WinningLineType {
-    case horizontal
-    case vertical  
-    case diagonal
-}
-
-#Preview {
-    ModernVictoryView(
-        gameResult: .win(.x),
-        gameMode: .normal,
-        botPlayer: nil,
-        winningLine: WinningLine(type: .horizontal, index: 0, positions: [(0, 0), (0, 1), (0, 2)]),
-        onPlayAgain: {},
-        onBackToMenu: {}
-    )
 }
